@@ -1,0 +1,32 @@
+{
+  "mcpServers": {
+    "context7": {
+      "disabled": true,
+      "url": "https://mcp.context7.com/mcp"
+    },
+    "playwright": {
+      "command": "cmd.exe",
+      "args": [
+        "/d",
+        "/c",
+        "npx",
+        "-y",
+        "@playwright/mcp@latest"
+      ],
+      "disabled": true
+    },
+    "stitch": {
+      "command": "cmd.exe",
+      "args": [
+        "/d",
+        "/c",
+        "stitch-mcp",
+        "proxy"
+      ],
+      "disabled": true,
+      "env": {
+        "STITCH_API_KEY": "<YOUR_STITCH_API_KEY>"
+      }
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "plugins": {
+    "hermes-memory": {
+      "enabled": true
+    },
+    "openclaw-ops": {
+      "enabled": true
+    },
+    "universal-modular-standard": {
+      "enabled": true
+    }
+  },
+  "userSettings": {
+    "artifactReviewMode": "ARTIFACT_REVIEW_MODE_ALWAYS",
+    "autoExecutionPolicy": "CASCADE_COMMANDS_AUTO_EXECUTION_EAGER",
+    "browserJsExecutionPolicy": "BROWSER_JS_EXECUTION_POLICY_ALWAYS_ASK",
+    "enableTerminalSandbox": false,
+    "nonWorkspaceFileAccessPolicy": "AGENT_SETTING_POLICY_ALLOW",
+    "permissionPreset": "AGENT_PERMISSION_PRESET_TURBO",
+    "queuedMessageDeliveryStrategy": "MESSAGE_DELIVERY_STRATEGY_WHEN_IDLE",
+    "themeMode": "THEME_MODE_DARK"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "name": "universal-modular-standard",
+  "displayName": "Universal Modular Architecture & LaTeX Standard",
+  "description": "Enforces universal 120-150 LOC modular decomposition, orthogonal 5-layer separation, DAG dependencies, and LaTeX .sumber/ decomposition with fast-scan indexing.",
+  "version": "1.0.0",
+  "author": "ramadhan-imanur"
+}

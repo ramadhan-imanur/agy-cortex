@@ -1,0 +1,11 @@
+{
+  "name": "hermes-memory",
+  "displayName": "Hermes Memory Engine",
+  "description": "Zero-RAM Hermes-style persistent memory: bounded USER.md and MEMORY.md snapshots with self-compaction plus SQLite FTS5 episodic search.",
+  "version": "1.0.0",
+  "suggestedPrompts": [
+    "Tampilkan isi core memory dan daftar proyek yang tersimpan",
+    "Cari riwayat keputusan atau solusi bug tentang ...",
+    "Simpan progres proyek saat ini ke memori jangka panjang"
+  ]
+}
