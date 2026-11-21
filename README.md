@@ -26,24 +26,25 @@ The system consists of three modular layers:
 - Enforces modular design constraints across all languages: maximum 150 lines of code per module, thin orchestrators under 80 lines, and 5-layer orthogonal decomposition.
 - Includes a LaTeX modular compilation workflow with index caching.
 
-## Repository Layout
+## Agent Workflow
 
-```text
-agy-cortex/
-├── plugins/
-│   ├── hermes-memory/              # Hermes persistent memory plugin
-│   ├── openclaw-ops/               # OpenClaw heartbeat operations plugin
-│   └── universal-modular-standard/ # Modular architecture rules and LaTeX skill
-├── scripts/
-│   ├── hmem.py                     # Hermes CLI engine for episodic SQLite FTS5 search
-│   └── heartbeat.py                # Deterministic heartbeat monitor
-└── templates/
-    ├── USER.example.md             # Core user profile template (max 1500 chars)
-    ├── MEMORY.example.md           # Core machine and workspace template (max 2500 chars)
-    ├── HEARTBEAT.example.md        # Thresholds and service checklist
-    ├── config.example.json         # Global Antigravity settings template
-    └── mcp_config.example.json     # MCP server configuration template
-```
+The interaction lifecycle follows a structured three-phase execution loop:
+
+### 1. Session Boot and Context Ingestion
+- Antigravity loads the core protocol from `rules/AGENTS.md`.
+- Active constraints and preferences from `USER.md` (capped at 1500 characters) and environment state from `MEMORY.md` (capped at 2500 characters) are injected directly into the session.
+- The session starts immediately without reading historical project logs.
+
+### 2. Task Execution and Episodic Retrieval
+- **On-Demand Search:** When context about past conventions, bugfixes, or prior architecture is needed, the agent runs `hmem search "<keywords>"`. Relevant snippets return in under 5 milliseconds from the local SQLite FTS5 index.
+- **Rule Superseding:** When an agreement changes, the agent records the update with `hmem add --project "<name>" --category "<type>" --title "<title>" --content "<text>" --replace`. This overwrites stale entries and prevents contradictory instructions.
+- **Snapshot Updates:** Milestones or critical rule adjustments are committed back to `USER.md` or `MEMORY.md` using `hmem core-set`, which strictly enforces character limits.
+
+### 3. Background Maintenance and Heartbeat
+- **Scheduled Monitoring:** The host operating system runs `heartbeat.py` every 30 minutes (0 MB idle, 0 LLM tokens).
+- **System Checks:** Verifies disk usage, free RAM, swap limits, and background task health. Alerts emit desktop notifications only when predefined thresholds fail.
+- **Automated Workspace Indexing:** Every 24 hours, modified `PROGRESS.md` documents across project directories are indexed into the SQLite archive.
+- **Storage Synchronization:** When portable storage is mounted, `hmem sync-disk` runs in quiet mode to keep episodic records and citations consistent across machines.
 
 ## Setup and Installation
 
