@@ -1,130 +1,117 @@
 # agy-cortex
 
-Persistent memory engine and zero-token proactive monitor for Antigravity agents.
+Give your Antigravity agent a long-term memory and quiet system checks, without installing third-party apps.
 
-## Overview
+---
 
-`agy-cortex` gives Antigravity agents long-term episodic memory, bounded context snapshots, and scheduled local health checks. It runs strictly on standard Python libraries and native Antigravity plugin rules with zero idle RAM usage and zero background LLM token consumption.
+Open a new chat with an AI agent and it acts like you have never met. Yesterday you spent twenty minutes explaining your project layout, fixing a tricky bug, and agreeing on how tests should run. Today you start from zero, pasting massive status notes into the chat box so the agent catches up.
 
-## Motivation and Design Philosophy
+Tools like **Hermes Agent** and **OpenClaw** solve parts of this problem, yet many people cannot run them alongside Antigravity. Work laptops often block third-party agent software and external bots. Even when allowed, running separate Node.js or Docker daemons eats RAM all day and risks burning AI tokens in the background.
 
-### The Problem
-Many Antigravity users face two recurring limitations when working on multi-session projects:
-1. **Context Loss Across Sessions:** Without persistent storage, agents forget prior architectural decisions, resolved bugs, and workflow conventions as soon as a conversation ends. Manually pasting long `PROGRESS.md` files into every new session wastes token budget and degrades prompt focus.
-2. **Third-Party Application Restrictions:** External agent ecosystems such as **Hermes Agent** and **OpenClaw** address memory and proactive daemon execution, but many users are restricted from installing or running third-party agent applications, external gateways, or heavy Node.js/Docker background daemons alongside Antigravity due to workplace policies, restricted environments, or tight hardware limits.
+`agy-cortex` gives you those capabilities inside Antigravity itself using native plugin rules and lightweight Python scripts.
 
-### Architectural Approach (Not a Fork)
-`agy-cortex` is **not a fork** of Hermes Agent or OpenClaw, and it does not depend on or execute any third-party application binaries. Instead, it applies their proven architectural concepts through clean native reimplementation (*Observe, Adapt, Modify*):
+## Built from scratch, inspired by proven ideas
 
-| External Architectural Inspiration | Native Implementation in `agy-cortex` | Key Mechanism |
+`agy-cortex` is not a fork of Hermes Agent or OpenClaw, and it never runs external software or background bots. Instead, it takes their core architectural patterns (*Observe, Adapt, Modify*) and rebuilds them cleanly with Python's built-in tools:
+
+| Pattern adapted | Module in `agy-cortex` | What you get |
 | :--- | :--- | :--- |
-| **Hermes-style Bounded Memory & Recall** | `cortex-memory` (`scripts/cmem.py`) | Bounded `USER.md` and `MEMORY.md` snapshots compiled into `AGENTS.md`, paired with local SQLite FTS5 search (`<5ms`). |
-| **OpenClaw-style Proactive Heartbeats** | `cortex-pulse` (`scripts/pulse.py`) | Deterministic system checks and workspace syncing triggered by native OS schedulers (0 MB idle, 0 LLM tokens). |
+| **Short profile snapshots + fast lookup** (Hermes style) | `cortex-memory` (`scripts/cmem.py`) | A compact two-page cheat sheet loaded at startup, plus a searchable local notebook that recalls old decisions in under 5 milliseconds. |
+| **Scheduled health checks** (OpenClaw style) | `cortex-pulse` (`scripts/pulse.py`) | A timer that checks disk space, free memory, and backups every 30 minutes using 0 MB RAM when idle and 0 AI tokens. |
 
-This design delivers persistent cognitive awareness and proactive maintenance entirely inside Antigravity's sanctioned plugin and Python runtime boundaries.
+Everything runs under your normal Antigravity workspace rules. No external gateway, no always-on server, and no background API bills.
 
-## Architecture
+## How your agent uses it
 
-### 1. Cortex Memory Engine (`plugins/cortex-memory` and `scripts/cmem.py`)
-- **Core Snapshots:** Keeps `USER.md` (max 1500 characters) and `MEMORY.md` (max 2500 characters) synchronized across sessions.
-- **Episodic SQLite Archive:** Stores decisions, bugfixes, progress notes, and conventions in a local SQLite database indexed with FTS5 for sub-5ms BM25 full-text retrieval.
-- **Conflict Prevention:** Uses `--replace` flags to overwrite outdated rules instead of stacking contradictory instructions.
-- **Cross-Device Sync:** Supports bidirectional synchronization across machines using optional portable storage.
-
-### 2. Cortex Pulse Monitor (`plugins/cortex-pulse` and `scripts/pulse.py`)
-- **Proactive Health Checks:** Monitors disk usage, available RAM, swap limits, and scheduler health via Windows Task Scheduler or Linux systemd user timers.
-- **Zero Token Idle:** Executes entirely with deterministic Python checks without invoking background LLM APIs.
-- **Cooldown Alerts:** Emits desktop notifications only when thresholds fail and outside cooldown windows.
-- **Workspace Indexing:** Scans modified `PROGRESS.md` files across configured project roots once every 24 hours.
-
-## Agent Workflow
-
-The interaction lifecycle follows a three-phase execution loop across foreground sessions and background maintenance:
+Think of `agy-cortex` as giving your assistant two everyday habits: glance at a short cheat sheet before starting work, and write down important decisions in a local notebook instead of cramming every chat into short-term memory.
 
 ```mermaid
 flowchart TD
-    subgraph P1["1. Session Boot (Context Ingestion)"]
-        Start(["New Antigravity Session"]) --> Boot["Load rules/AGENTS.md"]
-        Boot --> Inject["Inject Bounded Snapshots: USER.md + MEMORY.md (~900 tokens)"]
+    subgraph P1 ["1. Opening a new chat"]
+        Start(["You start a new chat"]) --> Boot["Agent reads rules/AGENTS.md"]
+        Boot --> Inject["Reads short cheat sheets: USER.md + MEMORY.md (~900 tokens)"]
     end
 
-    subgraph P2["2. Task Execution (Episodic Recall and Updates)"]
-        Inject --> Task["Process User Request"]
-        Task --> NeedCtx{"Need Past Context?"}
-        NeedCtx -- "Yes" --> Search["cmem.py search (under 5ms SQLite FTS5)"]
-        Search --> Execute["Execute Task"]
+    subgraph P2 ["2. Doing the work"]
+        Inject --> Task["You ask for help"]
+        Task --> NeedCtx{"Need old project details?"}
+        NeedCtx -- "Yes" --> Search["Looks up notebook via cmem.py search (under 5ms)"]
+        Search --> Execute["Agent completes the task"]
         NeedCtx -- "No" --> Execute
-        Execute --> NewDecision{"New Decision or Rule?"}
-        NewDecision -- "Yes" --> AddDB["cmem.py add --replace (Supersede in memory.db)"]
-        NewDecision -- "No" --> Done(["Turn Complete"])
-        AddDB --> CoreChange{"Update Core Snapshot?"}
-        CoreChange -- "Yes" --> CoreSet["cmem.py core-set (Enforce Cap and Recompile AGENTS.md)"]
+        Execute --> NewDecision{"Did rules or plans change?"}
+        NewDecision -- "Yes" --> AddDB["Updates notebook via cmem.py add --replace"]
+        NewDecision -- "No" --> Done(["Reply ready"])
+        AddDB --> CoreChange{"Update main cheat sheet?"}
+        CoreChange -- "Yes" --> CoreSet["Updates USER.md or MEMORY.md within size cap"]
         CoreChange -- "No" --> Done
         CoreSet --> Done
     end
 
-    subgraph P3["3. Background Loop (Zero-Token Pulse every 30m)"]
-        Cron(["OS Scheduler: Task Scheduler / systemd"]) --> Pulse["Run pulse.py (0 LLM Tokens)"]
-        Pulse --> Health["Check Disk, RAM, Swap and Services"]
-        Health --> Alert{"Threshold Breached?"}
-        Alert -- "Yes" --> Notify["Send Cooldown Desktop Alert"]
-        Alert -- "No" --> Portable{"Portable Disk Mounted?"}
+    subgraph P3 ["3. Quiet background check (every 30 minutes)"]
+        Cron(["OS timer wakes up"]) --> Pulse["Runs pulse.py (0 AI tokens used)"]
+        Pulse --> Health["Checks disk space, memory, and background tasks"]
+        Health --> Alert{"Is anything running low?"}
+        Alert -- "Yes" --> Notify["Shows a single desktop alert"]
+        Alert -- "No" --> Portable{"Backup drive plugged in?"}
         Notify --> Portable
-        Portable -- "Yes" --> SyncDisk["cmem.py sync-disk (Merge DB and Citations)"]
-        Portable -- "No" --> Index24["Every 24h: Index Modified PROGRESS.md"]
+        Portable -- "Yes" --> SyncDisk["Syncs notebook across devices (cmem.py sync-disk)"]
+        Portable -- "No" --> Index24["Once a day: saves changes from PROGRESS.md files"]
         SyncDisk --> Index24
-        Index24 --> Sleep(["Exit (0 MB Idle RAM)"])
+        Index24 --> Sleep(["Exits cleanly (0 MB RAM when idle)"])
     end
 ```
 
-| Phase | Trigger | Key Action | Resource Impact |
+Each phase handles one clear job:
+
+| Phase | When it runs | What happens | Cost |
 | :--- | :--- | :--- | :--- |
-| **1. Session Boot** | New session starts | Loads `AGENTS.md` with bounded `USER.md` and `MEMORY.md` | ~900 tokens fixed |
-| **2. Task Execution** | Past context needed or rule updated | Queries `memory.db` via `cmem.py search` or overwrites rules with `--replace` | Under 5 ms local query |
-| **3. Background Pulse** | OS scheduler every 30 minutes | `pulse.py` checks system health, indexes `PROGRESS.md`, and syncs portable storage | 0 MB idle, 0 LLM tokens |
+| **Opening a chat** | Every new conversation | Loads your short `USER.md` and `MEMORY.md` cheat sheets | ~900 tokens total |
+| **Looking things up** | Only when past context matters | Searches local `memory.db` and pulls only matching lines | Under 5 ms locally |
+| **Background check** | Every 30 minutes via OS timer | Checks computer health, indexes updated notes, and syncs backup drives | 0 MB idle, 0 AI tokens |
 
-## Computational Overhead and Benchmarks
+## What it costs your computer and AI quota
 
-The framework is built for minimal footprint across both host hardware and model context budgets.
+A memory layer should never slow down your laptop or fill half the chat window before you type a word.
 
-### 1. Local Machine Footprint (Host System)
+### On your computer
 
-Because neither `cortex-memory` nor `cortex-pulse` runs persistent background daemon processes, idle RAM consumption stays at zero.
+Many background assistants stay open in memory all day. `agy-cortex` runs only when triggered and exits immediately afterward.
 
-| Operation / Component | Execution Model | Memory Footprint (RAM) | Latency / Runtime | Token Cost |
+| Action | How it runs | Peak RAM | Time taken | AI tokens |
 | :--- | :--- | :--- | :--- | :--- |
-| **Idle State** | On-demand (no background daemon) | 0 MB | 0 ms | 0 tokens |
-| **Episodic Search (`cmem.py search`)** | SQLite FTS5 (BM25 ranking) | < 18 MB peak | < 5 ms per query | 0 tokens |
-| **Memory Add / Replace (`cmem.py add`)** | WAL SQLite transaction | < 16 MB peak | < 10 ms | 0 tokens |
-| **Pulse Check (`pulse.py`)** | Deterministic Python process | < 25 MB peak | 15 to 35 ms | 0 tokens |
-| **Two-Way Disk Sync (`cmem.py sync-disk`)** | JSONL and SQLite reconciliation | < 22 MB peak | 80 to 200 ms | 0 tokens |
+| **Waiting between runs** | No background daemon | 0 MB | 0 ms | 0 tokens |
+| **Searching old notes (`cmem.py search`)** | Local SQLite FTS5 query | Under 18 MB | Under 5 ms | 0 tokens |
+| **Saving or replacing a rule (`cmem.py add`)** | Single database write | Under 16 MB | Under 10 ms | 0 tokens |
+| **Health check (`pulse.py`)** | Quick Python check | Under 25 MB | 15 to 35 ms | 0 tokens |
+| **Syncing to a backup drive (`cmem.py sync-disk`)** | File merge and check | Under 22 MB | 80 to 200 ms | 0 tokens |
 
-### 2. Context Window and Cognitive Overhead (Model Inference)
+### Inside the AI's head
 
-Unbounded context setups often dump full conversation transcripts or sprawling changelogs into every prompt, causing linear token growth and rule conflicts. `agy-cortex` keeps injected context constant and pulls episodic records selectively.
+Pasting massive chat logs or long `PROGRESS.md` files into every new session makes replies slower, wastes your quota, and confuses the model when old notes contradict new rules. `agy-cortex` gives the AI a short two-page reference sheet instead of a 100-page binder.
 
-| Metric | Unbounded History Setup | `agy-cortex` Architecture | Impact |
+| What gets measured | Pasting full history | Using `agy-cortex` | Why it helps |
 | :--- | :--- | :--- | :--- |
-| **Bootstrap Context Size** | 10,000 to 45,000+ tokens | ~800 to 1,000 tokens fixed | Over 90% context reduction |
-| **`USER.md` Snapshot Budget** | Uncapped (drifts over time) | <= 1,500 characters (~350 tokens) | Bounded, predictable user profile |
-| **`MEMORY.md` Snapshot Budget** | Uncapped (sprawling logs) | <= 2,500 characters (~600 tokens) | Concise machine state without bloat |
-| **Prompt Cache Efficiency** | Low (frequent prompt prefix shifts) | High (> 95% prefix cache hit) | Static core headers stay cached across turns |
-| **Decision Retrieval Cost** | Full history loaded every turn | ~150 to 300 tokens per query | Retrieves only matching snippets |
-| **Rule Conflict Rate** | High (old and new rules stack) | Zero (superseded via `--replace`) | Deterministic rule state |
+| **Startup context size** | 10,000 to 45,000+ tokens | ~800 to 1,000 tokens fixed | Over 90% smaller starting prompt |
+| **User profile cap (`USER.md`)** | Grows without limit | Max 1,500 characters (~350 tokens) | Keeps preferences concise |
+| **Machine notes cap (`MEMORY.md`)** | Piles up stale logs | Max 2,500 characters (~600 tokens) | Keeps system info current |
+| **Prompt cache reuse** | Low (text shifts constantly) | High (> 95% prefix cache hit) | Static cheat sheets stay cached across turns |
+| **Looking up old decisions** | Reads everything every turn | ~150 to 300 tokens per lookup | Pulls only the exact note needed |
+| **Conflicting rules** | Common (old notes stay behind) | Zero (`--replace` overwrites old rules) | Old decisions get replaced cleanly |
 
-## Global Setup and Installation
+## Setup in 5 minutes
 
-This setup is portable across Windows, Linux, and macOS for any Antigravity user.
+You do not need external databases, Docker, or Node.js. All you need is Python 3.10 or newer (pre-installed on most Mac and Linux machines, and quick to install on Windows).
 
-### 1. Install Plugins and Scripts
-On Windows (PowerShell):
+### 1. Copy the plugins and scripts
+
+**On Windows (PowerShell):**
 ```powershell
 New-Item -ItemType Directory -Path "$HOME\.gemini\config\plugins", "$HOME\.gemini\config\memory" -Force
 Copy-Item -Path "plugins\*" -Destination "$HOME\.gemini\config\plugins\" -Recurse -Force
 Copy-Item -Path "scripts\cmem.py", "scripts\pulse.py" -Destination "$HOME\.gemini\config\memory\" -Force
 ```
 
-On Linux / macOS:
+**On Mac or Linux (Terminal):**
 ```bash
 mkdir -p ~/.gemini/config/plugins ~/.gemini/config/memory
 cp -r plugins/* ~/.gemini/config/plugins/
@@ -132,48 +119,62 @@ cp scripts/cmem.py scripts/pulse.py ~/.gemini/config/memory/
 chmod +x ~/.gemini/config/memory/cmem.py ~/.gemini/config/memory/pulse.py
 ```
 
-### 2. Initialize Personal Memory Snapshots
-Copy the clean templates into your local configuration directory:
+### 2. Create your personal cheat sheets
+
+Copy the example templates into your config folder:
+
 ```bash
 cp templates/USER.example.md ~/.gemini/config/memory/USER.md
 cp templates/MEMORY.example.md ~/.gemini/config/memory/MEMORY.md
 cp templates/PULSE.example.md ~/.gemini/config/memory/PULSE.md
 ```
-Edit `USER.md` and `MEMORY.md` with your own preferences and environment details, then compile them into the plugin rules:
+
+Open `USER.md` and `MEMORY.md` in any text editor and add your own details (such as timezone, preferred tone, or where you keep project folders). Then initialize your local database:
+
 ```bash
 python ~/.gemini/config/memory/cmem.py init
 ```
 
-### 3. Configure Scheduled Background Checks
-- **Windows:** Create a Task Scheduler entry named `CortexPulse` running `python %USERPROFILE%\.gemini\config\memory\pulse.py` every 30 minutes.
-- **Linux:** Configure a `systemd --user` timer (`agy-pulse.timer`) running `python3 ~/.gemini/config/memory/pulse.py` every 30 minutes.
+This creates `memory.db` and wires your cheat sheets into Antigravity's plugin rules so every new chat starts with your context.
 
-### 4. Optional Environment Variables
-Customize runtime behavior globally without editing code:
+### 3. Turn on the 30-minute health check (optional)
 
-| Variable | Purpose | Default |
-| :--- | :--- | :--- |
-| `CORTEX_MEM_DIR` | Directory storing `memory.db`, `USER.md`, and `MEMORY.md` | `~/.gemini/config/memory` |
-| `CORTEX_ACTIVE_HOURS` | Active monitoring hours (`start-end`) | `7-22` |
-| `CORTEX_DISK_WARN_PCT` | Disk usage alert threshold percentage | `90` |
-| `CORTEX_RAM_AVAIL_MIN_MB` | Minimum free RAM threshold in MB | `400` |
-| `CORTEX_PROGRESS_ROOTS` | OS path-separated directories to scan for `PROGRESS.md` | `~/Projects`, `~/Documents/Projects` |
-| `CORTEX_DISK_MEM_DIR` | Explicit portable sync directory path | Auto-detected |
+If you want automatic warnings for low disk space or low RAM, plus background backup syncing:
+- **Windows:** Open Task Scheduler and create a task named `CortexPulse` that runs `python %USERPROFILE%\.gemini\config\memory\pulse.py` every 30 minutes.
+- **Linux:** Set up a `systemd --user` timer (`agy-pulse.timer`) that runs `python3 ~/.gemini/config/memory/pulse.py` every 30 minutes.
 
-### 5. Basic CLI Usage
+### 4. Try it yourself
+
+Run these commands directly, or let your Antigravity agent run them for you:
+
 ```bash
-# Search episodic memory
+# Search saved project notes
 python ~/.gemini/config/memory/cmem.py search "database migration"
 
-# Add or update a project decision
-python ~/.gemini/config/memory/cmem.py add --project "my-app" --category "decision" --title "JWT expiration" --content "Set JWT token lifetime to 15 minutes." --replace
+# Save a new decision (or overwrite an old one with the same title)
+python ~/.gemini/config/memory/cmem.py add --project "my-app" --category "decision" --title "Login timeout" --content "Set session timeout to 15 minutes." --replace
 
-# Run local pulse check manually
+# Print a live health check report
 python ~/.gemini/config/memory/pulse.py --report
 ```
 
-## Privacy Model
-All personal snapshots (`USER.md`, `MEMORY.md`), pulse checklists (`PULSE.md`), local databases (`memory.db`), API keys (`mcp_config.json`), and runtime logs are excluded via `.gitignore`. Only generic plugin schemas, automation scripts, and sanitized templates are stored in this repository.
+## Optional settings
+
+Change thresholds or folder paths with environment variables without editing any Python files:
+
+| Variable | What it controls | Default |
+| :--- | :--- | :--- |
+| `CORTEX_MEM_DIR` | Folder storing `memory.db`, `USER.md`, and `MEMORY.md` | `~/.gemini/config/memory` |
+| `CORTEX_ACTIVE_HOURS` | Hours when desktop notifications can appear (`start-end`) | `7-22` |
+| `CORTEX_DISK_WARN_PCT` | Disk fullness percentage that triggers an alert | `90` |
+| `CORTEX_RAM_AVAIL_MIN_MB` | Minimum free RAM in MB before alerting | `400` |
+| `CORTEX_PROGRESS_ROOTS` | Project folders scanned daily for `PROGRESS.md` files | `~/Projects`, `~/Documents/Projects` |
+| `CORTEX_DISK_MEM_DIR` | Explicit folder path on a portable backup drive | Auto-detected |
+
+## Your data stays local
+
+Personal notes (`USER.md`, `MEMORY.md`), checklists (`PULSE.md`), local databases (`memory.db`), API keys, and alert logs are ignored by `.gitignore`. Nothing personal leaves your machine. Only the shared plugin rules, scripts, and blank templates belong in this repository.
 
 ## License
+
 MIT
