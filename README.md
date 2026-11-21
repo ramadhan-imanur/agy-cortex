@@ -12,7 +12,7 @@ Tools like **Hermes Agent** and **OpenClaw** solve parts of this problem, yet ma
 
 ## Built from scratch, inspired by proven ideas
 
-`agy-cortex` is not a fork of Hermes Agent or OpenClaw, and it never runs external software or background bots. Instead, it takes their core architectural patterns (*Observe, Adapt, Modify*) and rebuilds them cleanly with Python's built-in tools:
+`agy-cortex` delivers these capabilities natively within Antigravity via built-in plugin rules and lightweight Python scripts, adapting the core architectural patterns of OpenClaw and Hermes Agent as outlined below:
 
 | Pattern adapted | Module in `agy-cortex` | What you get |
 | :--- | :--- | :--- |
