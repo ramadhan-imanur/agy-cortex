@@ -1,12 +1,11 @@
-# Core Snapshot: Machine & Project Memory (Keep <= 2500 characters)
+# Core Snapshot: Machine and Project Memory (Keep <= 2500 characters)
 
-- Machine & Runtime: Hostname `<HOSTNAME>`, OS: `<OS>`, Python `<VERSION>`, key CLIs: `git`, `uv`, `rg`.
-- Network & Remote: Active services, development environments, and endpoints.
-- Storage & Workspaces: Main code repository paths, portable disk mount points, and backup targets.
+- Machine and Runtime: Hostname `<HOSTNAME>`, OS `<OS>`, Python `<VERSION>`, key CLIs: `git`, `rg`, `uv`.
+- Storage and Workspaces: Local workspace directories (`~/Projects`), portable backup mount points.
 - Active Projects:
-  - Project A: Key architectural patterns, test commands (`pytest`), deployment targets.
-  - Project B: Database schemas, local endpoints, synchronization scripts.
+  - Project A: Key architecture notes, test commands (`pytest`), deployment targets.
+  - Project B: Database schemas, local endpoints, synchronization rules.
 - Operational Rules:
-  - Keep episodic memories indexed in SQLite FTS5 (`hmem`).
+  - Keep episodic memories indexed in SQLite FTS5 (`cmem.py`).
   - Supersede conflicting decisions with `--replace`.
-  - Maintain thin orchestrators and enforce modular file limits.
+  - Maintain clean boundaries between personal local state and shared code.

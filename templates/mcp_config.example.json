@@ -5,22 +5,16 @@
       "url": "https://mcp.context7.com/mcp"
     },
     "playwright": {
-      "command": "cmd.exe",
+      "command": "npx",
       "args": [
-        "/d",
-        "/c",
-        "npx",
         "-y",
         "@playwright/mcp@latest"
       ],
       "disabled": true
     },
     "stitch": {
-      "command": "cmd.exe",
+      "command": "stitch-mcp",
       "args": [
-        "/d",
-        "/c",
-        "stitch-mcp",
         "proxy"
       ],
       "disabled": true,

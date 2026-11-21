@@ -1,6 +1,0 @@
-{
-  "name": "openclaw-ops",
-  "displayName": "OpenClaw Ops & Heartbeat",
-  "version": "1.0.0",
-  "description": "Zero-RAM OpenClaw-style operations: proactive local heartbeat monitor, system health checks, and task automation without background LLM calls."
-}

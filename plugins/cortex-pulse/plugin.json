@@ -1,0 +1,6 @@
+{
+  "name": "cortex-pulse",
+  "displayName": "Cortex Pulse Monitor",
+  "version": "1.0.0",
+  "description": "Zero-RAM proactive operations for Antigravity: deterministic local health checks, threshold alerts, and scheduled workspace sync without background LLM calls."
+}

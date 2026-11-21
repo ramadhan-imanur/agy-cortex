@@ -1,0 +1,11 @@
+{
+  "name": "cortex-memory",
+  "displayName": "Cortex Memory Engine",
+  "description": "Zero-RAM persistent memory for Antigravity: bounded USER.md and MEMORY.md context snapshots with self-compaction plus SQLite FTS5 episodic search.",
+  "version": "1.0.0",
+  "suggestedPrompts": [
+    "Show core memory snapshots and tracked projects",
+    "Search past decisions or bugfixes about ...",
+    "Record current project progress to long-term memory"
+  ]
+}

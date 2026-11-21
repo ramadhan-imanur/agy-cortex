@@ -1,10 +1,9 @@
 # User Profile (Keep <= 1500 characters)
 
-- User: <your_name> (Full Name), Timezone: <UTC_OFFSET> (e.g. UTC+7).
-- Workflow & Rhythm: Work hours <START_TIME> - <END_TIME>. Prefers active recall and modular iterations.
-- Communication Style: Concise, direct, clear statements without conversational filler. Structured tables and clean markdown.
-- System & Accessibility: Screen-reader friendly markdown, lightweight tooling, zero heavy background daemons.
+- User: `<your_name>` (`Full Name`), Timezone: `<UTC_OFFSET>` (e.g. UTC+0, UTC+7).
+- Workflow and Rhythm: Active work hours `<START_TIME>` to `<END_TIME>`.
+- Communication Style: Concise, direct statements without conversational filler. Clean Markdown tables.
+- Accessibility: Screen-reader friendly structure, no decorative emojis in UI or headings.
 - Core Priorities:
-  1. Priority 1: <Main Academic / Work Goal>
-  2. Priority 2: <Health / Fitness Habit>
-  3. Priority 3: <Key Project / Initiative>
+  1. Primary Focus: `<Main Work or Study Objective>`
+  2. Secondary Track: `<Key Personal Project or Learning Goal>`

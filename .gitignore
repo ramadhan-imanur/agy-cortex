@@ -1,6 +1,8 @@
 # Core Personal Data (Always Local & Private)
 USER.md
 MEMORY.md
+PULSE.md
+HEARTBEAT.md
 memory.db
 memory.db-wal
 memory.db-shm
@@ -14,12 +16,16 @@ ledger.json
 *.log
 state/
 alerts.log
+pulse_state.json
+pulse_alerts.log
 
 # Environment & Secrets
 .env
 *.key
 *.pem
 credentials.json
+config.json
+mcp_config.json
 
 # Python
 __pycache__/
@@ -33,16 +39,6 @@ htmlcov/
 # Node / JS
 node_modules/
 npm-debug.log*
-
-# LaTeX build artifacts
-*.aux
-*.log
-*.out
-*.toc
-*.fls
-*.fdb_latexmk
-*.synctex.gz
-.build/
 
 # OS & Editor
 .DS_Store

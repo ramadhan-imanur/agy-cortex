@@ -1,12 +1,9 @@
 {
   "plugins": {
-    "hermes-memory": {
+    "cortex-memory": {
       "enabled": true
     },
-    "openclaw-ops": {
-      "enabled": true
-    },
-    "universal-modular-standard": {
+    "cortex-pulse": {
       "enabled": true
     }
   },

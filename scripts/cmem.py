@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Lightweight Hermes-style persistent memory engine for Antigravity.
+"""Cortex Memory Engine: Lightweight persistent memory for Antigravity.
 
 Maintains:
 1. Bounded core snapshots (USER.md <= 1500 chars, MEMORY.md <= 2500 chars)
 2. Zero-daemon SQLite FTS5 episodic archive (memory.db)
-3. Automatic compilation into hermes-memory plugin rules/AGENTS.md
+3. Automatic compilation into cortex-memory plugin rules/AGENTS.md
 4. Cross-OS bidirectional sync (Windows <-> Linux) via portable storage
 """
 
@@ -21,15 +21,15 @@ import string
 import sys
 from pathlib import Path
 
-BASE_DIR = Path(os.environ.get("HERMES_MEM_DIR", "~/.gemini/config/memory")).expanduser()
+BASE_DIR = Path(os.environ.get("CORTEX_MEM_DIR", "~/.gemini/config/memory")).expanduser()
 USER_FILE = BASE_DIR / "USER.md"
 MEMORY_FILE = BASE_DIR / "MEMORY.md"
 DB_FILE = BASE_DIR / "memory.db"
 CITATIONS_FILE = BASE_DIR / "citations" / "ledger.json"
 PLUGIN_AGENTS_FILE = Path(
     os.environ.get(
-        "HERMES_PLUGIN_AGENTS",
-        "~/.gemini/config/plugins/hermes-memory/rules/AGENTS.md",
+        "CORTEX_PLUGIN_AGENTS",
+        "~/.gemini/config/plugins/cortex-memory/rules/AGENTS.md",
     )
 ).expanduser()
 
@@ -90,23 +90,23 @@ _DISK_PATH_RE = re.compile(
 def build_protocol_header() -> str:
     """Build the AGENTS.md protocol header with OS-appropriate CLI invocation."""
     if os.name == "nt":
-        cli_hint = f'python "{BASE_DIR / "hmem.py"}"'
+        cli_hint = f'python "{BASE_DIR / "cmem.py"}"'
     else:
-        cli_hint = "python3 ~/.gemini/config/memory/hmem.py"
-    return f"""# Hermes-Lite Persistent Memory Protocol
+        cli_hint = "python3 ~/.gemini/config/memory/cmem.py"
+    return f"""# Cortex Persistent Memory Protocol
 
-You have a lightweight, zero-RAM persistent memory system modeled after Hermes Agent.
+You have a lightweight, zero-RAM persistent memory system built natively for Antigravity.
 - **Core Memory (Injected Below):** `USER.md` (max 1500 chars) and `MEMORY.md` (max 2500 chars) are already loaded below.
-- **Episodic Search (On-Demand):** Do NOT guess past project history. Search the SQLite FTS5 archive in <5ms when needed:
-  `{cli_hint} search "<keywords>"` (or `hmem search "<keywords>"`)
+- **Episodic Search (On-Demand):** Do not guess past project history. Search the SQLite FTS5 archive in <5ms when needed:
+  `{cli_hint} search "<keywords>"`
 - **Save / Supersede Decisions:** After completing a milestone, solving a non-trivial bug, or changing a rule, record it:
-  - Detailed/episodic record: `{cli_hint} add --project "<name>" --category "<decision|progress|bugfix|note>" --title "<short title>" --content "<concise details>" [--replace]`
+  - Detailed/episodic record: `{cli_hint} add --project "<name>" --category "<decision|progress|bugfix|note|convention>" --title "<short title>" --content "<concise details>" [--replace]`
   - Use `--replace` when updating an existing rule/decision so old rules never collide.
   - Core snapshot update (`USER.md` / `MEMORY.md`): update via `{cli_hint} core-set <user|memory> --file <tmp>` (strict char cap enforced; consolidate old entries if near limit).
-- **Cross-Device & Workspace Continuity:**
-  - Prefer `{cli_hint} search --project "<name>"`, `git status`, and project graphs over creating bloated `PROGRESS.md` changelogs.
+- **Cross-Device and Workspace Continuity:**
+  - Prefer `{cli_hint} search --project "<name>"` and `git status` over creating bloated `PROGRESS.md` changelogs.
   - If an existing `PROGRESS.md` or state doc is updated, overwrite stale rules in place with only the latest compact decisions; run `{cli_hint} sync-disk` after key milestones when portable storage is mounted.
-- **Accessibility & Directness:** Match reply length to the weight of the ask: clear claims, structured tables, and clean Markdown without conversational filler.
+- **Directness:** Match reply length to the weight of the ask with plain claims, clear headings, and concise tables.
 """
 
 
@@ -118,7 +118,11 @@ def get_conn(db_path: Path = DB_FILE, journal_mode: str = "WAL") -> sqlite3.Conn
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
-    sql = SCHEMA_SQL if journal_mode.upper() == "WAL" else SCHEMA_SQL.replace("PRAGMA journal_mode=WAL;", f"PRAGMA journal_mode={journal_mode};")
+    sql = (
+        SCHEMA_SQL
+        if journal_mode.upper() == "WAL"
+        else SCHEMA_SQL.replace("PRAGMA journal_mode=WAL;", f"PRAGMA journal_mode={journal_mode};")
+    )
     conn.executescript(sql)
     return conn
 
@@ -162,7 +166,7 @@ def safe_fts_query(raw: str, join_or: bool = False) -> str:
 
 
 def normalize_disk_relpath(raw_path: str) -> str | None:
-    """Convert OS-specific portable disk path to canonical '<disk>/rel/path'."""
+    """Convert OS-specific portable disk path to canonical '<portable-disk>/rel/path'."""
     norm = raw_path.strip().replace("\\", "/")
     if norm.startswith("<portable-disk>/"):
         return norm
@@ -197,10 +201,10 @@ def merge_tags(tags_a: str, tags_b: str) -> str:
 
 
 def find_portable_memory_dir(explicit: str = "") -> Path | None:
-    """Locate portable storage memory directory across Windows and Linux."""
+    """Locate portable storage memory directory across Windows, Linux, and macOS."""
     if explicit:
         return Path(explicit).expanduser().resolve()
-    env = os.environ.get("HERMES_DISK_MEM_DIR", "").strip()
+    env = os.environ.get("CORTEX_DISK_MEM_DIR", "").strip()
     if env:
         return Path(env).expanduser().resolve()
 
@@ -210,13 +214,17 @@ def find_portable_memory_dir(explicit: str = "") -> Path | None:
                 continue
             root = Path(f"{letter}:\\")
             mem_dir = root / ".agent" / "portable-setup" / "memory"
-            if (mem_dir / "hmem.py").exists() or (root / ".agent" / "INDEX.json").exists():
+            if (mem_dir / "cmem.py").exists() or (root / ".agent" / "INDEX.json").exists():
                 return mem_dir
         return None
 
     candidates: list[Path] = []
-    disk_label = os.environ.get("HERMES_PORTABLE_LABEL", "*")
-    for pat in (f"/media/*/{disk_label}/.agent/portable-setup/memory", f"/mnt/*/{disk_label}/.agent/portable-setup/memory", f"/Volumes/{disk_label}/.agent/portable-setup/memory"):
+    disk_label = os.environ.get("CORTEX_PORTABLE_LABEL", "*")
+    for pat in (
+        f"/media/*/{disk_label}/.agent/portable-setup/memory",
+        f"/mnt/*/{disk_label}/.agent/portable-setup/memory",
+        f"/Volumes/{disk_label}/.agent/portable-setup/memory",
+    ):
         candidates.extend(Path(p) for p in glob.glob(pat))
     for cand in candidates:
         if cand.exists():
@@ -517,7 +525,11 @@ def _merge_entry_sets(*sources: list[dict[str, str]]) -> list[dict[str, str]]:
             if prev is None:
                 merged[key] = rec
                 continue
-            earliest_created = min(prev["created_at"], rec["created_at"]) if prev["created_at"] and rec["created_at"] else (prev["created_at"] or rec["created_at"])
+            earliest_created = (
+                min(prev["created_at"], rec["created_at"])
+                if prev["created_at"] and rec["created_at"]
+                else (prev["created_at"] or rec["created_at"])
+            )
             combined_tags = merge_tags(prev["tags"], rec["tags"])
             winner = rec if rec["updated_at"] >= prev["updated_at"] else prev
             merged[key] = {
@@ -662,7 +674,7 @@ def cmd_sync_disk(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Hermes-Lite memory CLI for Antigravity")
+    parser = argparse.ArgumentParser(description="Cortex Memory CLI for Antigravity")
     sub = parser.add_subparsers(dest="command", required=True)
 
     sub.add_parser("init", help="Initialize DB, core files, and plugin AGENTS.md")

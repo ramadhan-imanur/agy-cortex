@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""OpenClaw-style zero-token proactive heartbeat monitor (Windows & Linux).
+"""Cortex Pulse: Zero-token proactive local monitor for Antigravity (Windows & Linux).
 
 Runs periodically via Windows Task Scheduler / systemd user timer (0 MB idle).
-Performs deterministic local checks (disks, RAM/pagefile, critical services or
-scheduler health, and periodic PROGRESS.md sync into hmem) with zero LLM calls.
+Performs deterministic local checks (disks, RAM/pagefile, scheduler health, and
+periodic PROGRESS.md sync into cmem.py) with zero LLM calls.
 Logs anomalies locally and emits a desktop notification only outside cooldown.
 """
 
@@ -25,19 +25,29 @@ from pathlib import Path
 SCRIPTS_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS_DIR))
 
-STATE_FILE = SCRIPTS_DIR / "state/heartbeat_state.json"
-ALERT_LOG = SCRIPTS_DIR / "state/heartbeat_alerts.log"
-HEARTBEAT_MD = Path(os.environ.get("AGY_HEARTBEAT_MD", "~/.gemini/config/memory/HEARTBEAT.md")).expanduser()
-HMEM_SCRIPT = Path(os.environ.get("AGY_HMEM_SCRIPT", "~/.gemini/config/memory/hmem.py")).expanduser()
+STATE_FILE = SCRIPTS_DIR / "state/pulse_state.json"
+ALERT_LOG = SCRIPTS_DIR / "state/pulse_alerts.log"
+PULSE_MD = Path(os.environ.get("CORTEX_PULSE_MD", "~/.gemini/config/memory/PULSE.md")).expanduser()
+CMEM_SCRIPT = Path(os.environ.get("CORTEX_CMEM_SCRIPT", "~/.gemini/config/memory/cmem.py")).expanduser()
 
 PROGRESS_SYNC_INTERVAL = 24 * 3600
 SYNC_DISK_INTERVAL = 1800
 
-DISK_WARN_PCT = int(os.environ.get("AGY_DISK_WARN_PCT", "90"))
-RAM_AVAIL_MIN_MB = int(os.environ.get("AGY_RAM_AVAIL_MIN_MB", "400"))
-SWAP_WARN_PCT = int(os.environ.get("AGY_SWAP_WARN_PCT", "85"))
-COOLDOWN_SECONDS = int(os.environ.get("AGY_COOLDOWN_HOURS", "4")) * 3600
-WIN_TASK_NAME = os.environ.get("AGY_WIN_TASK_NAME", "AntigravityHeartbeat")
+DISK_WARN_PCT = int(os.environ.get("CORTEX_DISK_WARN_PCT", "90"))
+RAM_AVAIL_MIN_MB = int(os.environ.get("CORTEX_RAM_AVAIL_MIN_MB", "400"))
+SWAP_WARN_PCT = int(os.environ.get("CORTEX_SWAP_WARN_PCT", "85"))
+COOLDOWN_SECONDS = int(os.environ.get("CORTEX_COOLDOWN_HOURS", "4")) * 3600
+WIN_TASK_NAME = os.environ.get("CORTEX_WIN_TASK_NAME", "CortexPulse")
+
+
+def parse_active_hours() -> tuple[int, int]:
+    """Return active monitoring hour window (start, end), default 7-22."""
+    raw = os.environ.get("CORTEX_ACTIVE_HOURS", "7-22").strip()
+    try:
+        start_s, end_s = raw.split("-", 1)
+        return int(start_s), int(end_s)
+    except ValueError:
+        return 7, 22
 
 
 def silent_run(cmd: list[str] | str, **kwargs) -> subprocess.CompletedProcess:
@@ -62,13 +72,13 @@ class _MemoryStatusEx(ctypes.Structure):
 
 
 def find_external_disk() -> Path | None:
-    """Locate portable storage workspace disk across Windows and Linux."""
-    env_dir = os.environ.get("HERMES_DISK_MEM_DIR", "").strip()
+    """Locate portable storage workspace disk across Windows, Linux, and macOS."""
+    env_dir = os.environ.get("CORTEX_DISK_MEM_DIR", "").strip()
     if env_dir and Path(env_dir).exists():
         return Path(env_dir)
 
     if os.name != "nt":
-        label = os.environ.get("HERMES_PORTABLE_LABEL", "*")
+        label = os.environ.get("CORTEX_PORTABLE_LABEL", "*")
         for pat in (f"/media/*/{label}", f"/mnt/*/{label}", f"/Volumes/{label}"):
             for match in glob.glob(pat):
                 p = Path(match)
@@ -88,7 +98,7 @@ def find_external_disk() -> Path | None:
 def get_progress_roots(ext_disk: Path | None) -> list[Path]:
     """Return candidate directories containing project PROGRESS.md files."""
     roots: list[Path] = []
-    custom = os.environ.get("AGY_PROGRESS_ROOTS", "").strip()
+    custom = os.environ.get("CORTEX_PROGRESS_ROOTS", "").strip()
     if custom:
         for p in custom.split(os.pathsep):
             cand = Path(p).expanduser().resolve()
@@ -189,7 +199,7 @@ def get_failed_user_units() -> list[str]:
 
 
 def check_windows_services(alerts: list[tuple[str, str]], summary: list[str]) -> None:
-    """Check optional Windows services and scheduled task health."""
+    """Check Windows scheduled task health."""
     task_res = silent_run(
         ["schtasks", "/Query", "/TN", WIN_TASK_NAME, "/FO", "LIST"],
         capture_output=True,
@@ -199,7 +209,7 @@ def check_windows_services(alerts: list[tuple[str, str]], summary: list[str]) ->
         disabled = "Disabled" in task_res.stdout
         summary.append(f"Task {WIN_TASK_NAME}: {'DISABLED' if disabled else 'ready'}")
         if disabled:
-            alerts.append(("task_heartbeat", f"Scheduled Task inactive: {WIN_TASK_NAME}"))
+            alerts.append(("task_pulse", f"Scheduled Task inactive: {WIN_TASK_NAME}"))
     else:
         summary.append(f"Task {WIN_TASK_NAME}: NOT REGISTERED")
 
@@ -237,7 +247,7 @@ def run_checks() -> tuple[list[tuple[str, str]], list[str]]:
         if gpu_line:
             summary.append(gpu_line)
         check_windows_services(alerts, summary)
-    else:
+    elif shutil.which("systemctl"):
         failed = get_failed_user_units()
         if failed:
             summary.append(f"Failed user units: {', '.join(failed)}")
@@ -249,8 +259,8 @@ def run_checks() -> tuple[list[tuple[str, str]], list[str]]:
 
 
 def sync_progress_files(state: dict, now_ts: int) -> int:
-    """Index changed PROGRESS.md files into hmem once per 24h (0 LLM tokens)."""
-    if not HMEM_SCRIPT.exists():
+    """Index changed PROGRESS.md files into cmem once per 24h (0 LLM tokens)."""
+    if not CMEM_SCRIPT.exists():
         return 0
     if now_ts - state.get("last_progress_sync", 0) < PROGRESS_SYNC_INTERVAL:
         return 0
@@ -270,7 +280,7 @@ def sync_progress_files(state: dict, now_ts: int) -> int:
             key = str(p)
             if mtimes.get(key) != mt:
                 res = silent_run(
-                    [py_exe, str(HMEM_SCRIPT), "index-progress", key],
+                    [py_exe, str(CMEM_SCRIPT), "index-progress", key],
                     capture_output=True,
                     timeout=15,
                 )
@@ -283,12 +293,12 @@ def sync_progress_files(state: dict, now_ts: int) -> int:
 
 def sync_disk_memory(state: dict, now_ts: int) -> bool:
     """Merge local episodic memory & citations with portable storage when mounted."""
-    if not HMEM_SCRIPT.exists() or find_external_disk() is None:
+    if not CMEM_SCRIPT.exists() or find_external_disk() is None:
         return False
     if now_ts - state.get("last_disk_sync", 0) < SYNC_DISK_INTERVAL:
         return False
     res = silent_run(
-        [sys.executable, str(HMEM_SCRIPT), "sync-disk", "--quiet"],
+        [sys.executable, str(CMEM_SCRIPT), "sync-disk", "--quiet"],
         capture_output=True,
         timeout=30,
     )
@@ -310,11 +320,11 @@ def emit_local_alert(body: str, now_dt: dt.datetime) -> None:
             "$n = New-Object System.Windows.Forms.NotifyIcon; "
             "$n.Icon = [System.Drawing.SystemIcons]::Warning; "
             "$n.Visible = $true; "
-            "$n.ShowBalloonTip(5000, 'Antigravity Heartbeat', $env:AGY_HEARTBEAT_MSG, [System.Windows.Forms.ToolTipIcon]::Warning); "
+            "$n.ShowBalloonTip(5000, 'Cortex Pulse', $env:CORTEX_PULSE_MSG, [System.Windows.Forms.ToolTipIcon]::Warning); "
             "Start-Sleep -Milliseconds 300; $n.Dispose()"
         )
         env = os.environ.copy()
-        env["AGY_HEARTBEAT_MSG"] = body[:240]
+        env["CORTEX_PULSE_MSG"] = body[:240]
         silent_run(
             ["powershell.exe", "-NoProfile", "-WindowStyle", "Hidden", "-Command", ps_cmd],
             env=env,
@@ -322,18 +332,19 @@ def emit_local_alert(body: str, now_dt: dt.datetime) -> None:
             timeout=10,
         )
     elif shutil.which("notify-send"):
-        silent_run(["notify-send", "Antigravity Heartbeat", body], capture_output=True)
+        silent_run(["notify-send", "Cortex Pulse", body], capture_output=True)
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="OpenClaw-style local heartbeat check")
+    parser = argparse.ArgumentParser(description="Cortex Pulse local proactive monitor")
     parser.add_argument("--report", action="store_true", help="Print full status report (even if healthy)")
     parser.add_argument("--dry-run", action="store_true", help="Do not send notifications or persist sync")
-    parser.add_argument("--ignore-quiet-hours", action="store_true", help="Run even during night hours")
+    parser.add_argument("--ignore-quiet-hours", action="store_true", help="Run even outside active hours")
     args = parser.parse_args()
 
     now_dt = dt.datetime.now()
-    if not args.report and not args.ignore_quiet_hours and not (7 <= now_dt.hour <= 22):
+    start_h, end_h = parse_active_hours()
+    if not args.report and not args.ignore_quiet_hours and not (start_h <= now_dt.hour <= end_h):
         return 0
 
     now_ts = int(time.time())
@@ -360,7 +371,7 @@ def main() -> int:
         save_state(state)
 
     if args.report:
-        print("=== Antigravity Heartbeat Report ===")
+        print("=== Cortex Pulse Report ===")
         print(f"Timestamp: {now_dt.strftime('%Y-%m-%d %H:%M:%S')}")
         for line in summary:
             print(f"- {line}")
