@@ -39,23 +39,49 @@ This design delivers persistent cognitive awareness and proactive maintenance en
 
 ## Agent Workflow
 
-The interaction lifecycle follows a three-phase execution loop:
+The interaction lifecycle follows a three-phase execution loop across foreground sessions and background maintenance:
 
-### 1. Session Boot and Context Ingestion
-- Antigravity loads the core protocol from `rules/AGENTS.md`.
-- Active preferences from `USER.md` (capped at 1500 characters) and environment context from `MEMORY.md` (capped at 2500 characters) are injected directly into the session.
-- The session starts immediately without scanning historical logs.
+```mermaid
+flowchart TD
+    subgraph P1["1. Session Boot (Context Ingestion)"]
+        Start(["New Antigravity Session"]) --> Boot["Load rules/AGENTS.md"]
+        Boot --> Inject["Inject Bounded Snapshots: USER.md + MEMORY.md (~900 tokens)"]
+    end
 
-### 2. Task Execution and Episodic Retrieval
-- **On-Demand Search:** When context about past conventions, bugfixes, or prior architecture is needed, the agent executes `cmem.py search "<keywords>"`. Relevant snippets return in under 5 milliseconds from the local SQLite FTS5 index.
-- **Rule Superseding:** When an agreement changes, the agent records the update with `cmem.py add --project "<name>" --category "<type>" --title "<title>" --content "<text>" --replace`. This replaces stale entries and prevents contradictory rules.
-- **Snapshot Updates:** Milestones or core rule updates are written to `USER.md` or `MEMORY.md` using `cmem.py core-set`, which strictly enforces character caps.
+    subgraph P2["2. Task Execution (Episodic Recall and Updates)"]
+        Inject --> Task["Process User Request"]
+        Task --> NeedCtx{"Need Past Context?"}
+        NeedCtx -- "Yes" --> Search["cmem.py search (under 5ms SQLite FTS5)"]
+        Search --> Execute["Execute Task"]
+        NeedCtx -- "No" --> Execute
+        Execute --> NewDecision{"New Decision or Rule?"}
+        NewDecision -- "Yes" --> AddDB["cmem.py add --replace (Supersede in memory.db)"]
+        NewDecision -- "No" --> Done(["Turn Complete"])
+        AddDB --> CoreChange{"Update Core Snapshot?"}
+        CoreChange -- "Yes" --> CoreSet["cmem.py core-set (Enforce Cap and Recompile AGENTS.md)"]
+        CoreChange -- "No" --> Done
+        CoreSet --> Done
+    end
 
-### 3. Background Maintenance and Pulse
-- **Scheduled Monitoring:** The host operating system runs `pulse.py` every 30 minutes (0 MB idle, 0 LLM tokens).
-- **System Checks:** Verifies disk space, free RAM, swap usage, and scheduler health. Desktop notifications fire only on real threshold breaches.
-- **Automated Workspace Indexing:** Every 24 hours, changed `PROGRESS.md` documents across project directories are indexed into SQLite.
-- **Storage Synchronization:** When portable storage is mounted, `cmem.py sync-disk` runs quietly to keep episodic records and citations synchronized across devices.
+    subgraph P3["3. Background Loop (Zero-Token Pulse every 30m)"]
+        Cron(["OS Scheduler: Task Scheduler / systemd"]) --> Pulse["Run pulse.py (0 LLM Tokens)"]
+        Pulse --> Health["Check Disk, RAM, Swap and Services"]
+        Health --> Alert{"Threshold Breached?"}
+        Alert -- "Yes" --> Notify["Send Cooldown Desktop Alert"]
+        Alert -- "No" --> Portable{"Portable Disk Mounted?"}
+        Notify --> Portable
+        Portable -- "Yes" --> SyncDisk["cmem.py sync-disk (Merge DB and Citations)"]
+        Portable -- "No" --> Index24["Every 24h: Index Modified PROGRESS.md"]
+        SyncDisk --> Index24
+        Index24 --> Sleep(["Exit (0 MB Idle RAM)"])
+    end
+```
+
+| Phase | Trigger | Key Action | Resource Impact |
+| :--- | :--- | :--- | :--- |
+| **1. Session Boot** | New session starts | Loads `AGENTS.md` with bounded `USER.md` and `MEMORY.md` | ~900 tokens fixed |
+| **2. Task Execution** | Past context needed or rule updated | Queries `memory.db` via `cmem.py search` or overwrites rules with `--replace` | Under 5 ms local query |
+| **3. Background Pulse** | OS scheduler every 30 minutes | `pulse.py` checks system health, indexes `PROGRESS.md`, and syncs portable storage | 0 MB idle, 0 LLM tokens |
 
 ## Computational Overhead and Benchmarks
 
